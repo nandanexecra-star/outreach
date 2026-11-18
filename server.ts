@@ -114,6 +114,15 @@ async function startServer() {
   });
 
 
+  // --- Health check endpoint (also used for self-ping to keep Render free tier alive) ---
+  app.get("/api/health", (_req, res) => {
+    res.json({
+      ok: true,
+      uptime: Math.floor(process.uptime()),
+      timestamp: new Date().toISOString(),
+    });
+  });
+
   // --- Simple Workspace Login ---
   app.get("/api/auth/session", (req, res) => {
     const db = readDb();
@@ -1255,6 +1264,25 @@ async function startServer() {
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`DECILE Outreach live server listening on http://0.0.0.0:${PORT}`);
+
+    // Self-ping every 14 minutes to prevent Render free tier from spinning down
+    // (Render spins down free instances after 15 minutes of inactivity)
+    if (process.env.NODE_ENV === "production") {
+      const selfUrl = (process.env.APP_URL || `http://0.0.0.0:${PORT}`).replace(/\/$/, "");
+      const PING_INTERVAL_MS = 14 * 60 * 1000; // 14 minutes
+
+      setInterval(async () => {
+        try {
+          const res = await fetch(`${selfUrl}/api/health`);
+          const data = await res.json() as { ok: boolean; uptime: number };
+          console.log(`[keep-alive] ping ok — uptime ${data.uptime}s`);
+        } catch (err) {
+          console.warn(`[keep-alive] ping failed:`, (err as Error).message);
+        }
+      }, PING_INTERVAL_MS);
+
+      console.log(`[keep-alive] Self-ping active every 14 min → ${selfUrl}/api/health`);
+    }
   });
 }
 
