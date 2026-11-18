@@ -8,12 +8,10 @@ let _firestore: Firestore | null = null;
  * Returns a singleton Firestore instance initialised from env vars.
  *
  * Required env vars (set in Render dashboard):
- *   FIREBASE_PROJECT_ID   – from your service-account JSON
- *   FIREBASE_CLIENT_EMAIL – from your service-account JSON
- *   FIREBASE_PRIVATE_KEY  – from your service-account JSON (the full PEM string)
- *
- * In local dev, set these in your .env file.
- * On Google Cloud (Cloud Run, etc.) Application Default Credentials are used as fallback.
+ *   FIREBASE_PROJECT_ID    – from your service-account JSON
+ *   FIREBASE_CLIENT_EMAIL  – from your service-account JSON
+ *   FIREBASE_PRIVATE_KEY   – from your service-account JSON (the full PEM string)
+ *   FIREBASE_DATABASE_ID   – your Firestore database ID (not "(default)")
  */
 export function getFirestoreDb(): Firestore {
   if (_firestore) return _firestore;
@@ -30,11 +28,17 @@ export function getFirestoreDb(): Firestore {
         projectId,
       });
     } else {
-      // Fallback: Application Default Credentials (works on Google Cloud infra)
+      // Fallback: Application Default Credentials
       initializeApp({ projectId: projectId ?? "ai-studio-applet-webapp-58eee" });
     }
   }
 
-  _firestore = getFirestore();
+  // Use named database ID from env var (required when not using the "(default)" database)
+  const databaseId =
+    process.env.FIREBASE_DATABASE_ID ||
+    "ai-studio-decileoutreach-1985b0cf-d4b0-41a0-a482-b300b4287da4";
+
+  _firestore = getFirestore(databaseId);
   return _firestore;
 }
+
